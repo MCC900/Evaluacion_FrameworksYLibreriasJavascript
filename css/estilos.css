@@ -96,7 +96,6 @@ div[class^='col']{
   flex-flow: column wrap;
   justify-content: flex-end;
   align-items: center;
-
 }
 
 .elemento{
