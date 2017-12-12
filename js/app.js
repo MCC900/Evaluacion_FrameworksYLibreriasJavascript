@@ -24,7 +24,7 @@ var milisFadeInOpacidad = 300;
 
 //Datos del Juego
 var estaColumnaRellena = [false, false, false, false, false, false, false]; //Vector de 7 bools que indican si cada columna esta completa
-
+var puntos;
 //--------------------[ ANIMACIÓN DEL TÍTULO ]-------------------------
 
 
@@ -204,9 +204,10 @@ function eliminarDulces(dulcesAEliminar){
     }, tiempoCaida, "swing");
   }
 
-  //Eliminamos los dulces, y marcamos las columnas para ser rellenadas
+  //Eliminamos los dulces, sumamos los puntos y marcamos las columnas para ser rellenadas
   for(var i = 0; i < dulcesAEliminar.length; i++){
     dulcesAEliminar[i].elDulce.remove();
+    sumarPunto();
     estaColumnaRellena[dulcesAEliminar[i].posX] = false;
   }
 
@@ -223,6 +224,11 @@ function dulceXYesDelTipo(x, y, tipo){
 function cederControlAUsuario(){
   //TO DO
 }
+
+function sumarPunto(){
+  puntos++;
+  $(".score .data-info").html(puntos);
+}
 //----------------------------[/ JUEGO ]-------------------------------
 
 
@@ -232,8 +238,12 @@ $(function(){
 
   //Comenzamos la animación del título
   window.setTimeout(tituloABlanco, milisParpadeoTitulo);
-  //maxDulcesPorColumna = Math.floor( $(".col-1").height() / $(".col-1").width());
 
+  //Reiniciamos los puntos
+  puntos = 0;
+  $(".score .data-info").html("0");
+
+  //Rellenamos el tablero por primera vez
   rellenarTablero();
 });
 //-----------------------[/ INICIALIZACIÓN  ]--------------------------
