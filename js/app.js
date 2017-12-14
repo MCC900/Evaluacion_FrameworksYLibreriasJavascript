@@ -1,3 +1,6 @@
+
+
+
 //Función de easing personalizada para la desaparición de los dulces (soy un mago)
 //Info obtenida de http://brianwald.com/journal/creating-custom-jquery-easing-animations
 $.easing.titilar = function(x, t, b, c, d){
@@ -23,8 +26,9 @@ var esperaDesaparicionDulce = 500;
 var milisFadeInOpacidad = 300;
 
 //Datos del Juego
-var estaColumnaRellena = [false, false, false, false, false, false, false]; //Vector de 7 bools que indican si cada columna esta completa
+var estaColumnaRellena; //Vector de 7 bools que indican si cada columna esta completa
 var puntos;
+var iniciadoTimer; //El timer se inicia cuando se termina el llenado del tablero por primera vez
 //--------------------[ ANIMACIÓN DEL TÍTULO ]-------------------------
 
 
@@ -87,6 +91,8 @@ function anadirDulceAColumna(numeroColumna){
 function rellenarColumna(numeroColumna){
     var columna = $(".col-" + numeroColumna);
     var cantDulces = contarDulcesColumna(columna);
+
+    //Verificamos que la columna no esté llena
     if(cantDulces < maxDulcesPorColumna){
       anadirDulceAColumna(numeroColumna);
       window.setTimeout(function(){ rellenarColumna(numeroColumna); }, esperaSpawnDulce);
@@ -94,6 +100,12 @@ function rellenarColumna(numeroColumna){
       estaColumnaRellena[numeroColumna - 1] = true;
       if(todasLasColumnasRellenas()){
         window.setTimeout(verificarDulcesEnLinea, tiempoCaida);
+        if(!iniciadoTimer){
+          window.setTimeout(function(){
+            Cronometro.arrancar();
+            iniciadoTimer = true;
+          }, tiempoCaida);
+        }
       }
     }
 }
@@ -101,6 +113,14 @@ function rellenarColumna(numeroColumna){
 function rellenarTablero(){
   for(var i = 1; i <= 7; i++){
     rellenarColumna(i);
+  }
+}
+
+function limpiarTablero(){
+  estaColumnaRellena =  [false, false, false, false, false, false, false];
+  for(var i = 1; i <= 7; i++){
+    var columna = $(".col-" + i);
+    columna.empty();
   }
 }
 
@@ -123,6 +143,13 @@ function verificarDulcesEnLinea(){
       var dulce = columna.find("img:nth-child(" + (y+1) +")");
       var tipo = dulce.attr('src');
 
+      //Un dulce eliminado genera:
+      // 1 punto de base
+      //+1 punto si además es uno de los 2 centros de una línea d 4
+      //+2 puntos si además es el centro de una línea de 5
+      //Los puntos verticales y horizontales se calculan por separado y se suman
+      var puntosGenerados = 1;
+
       var arribaIgual = false;
       var dosArribaIgual = false;
       var abajoIgual = false;
@@ -137,7 +164,18 @@ function verificarDulcesEnLinea(){
          arribaIgual && abajoIgual ||
          abajoIgual && dosAbajoIgual){
          //Al menos tres en línea vertical
-         dulcesAEliminar[dulcesAEliminar.length] = {elDulce:dulce, posX:x, posY: y};
+         if(dosArribaIgual && arribaIgual && abajoIgual ||
+            arribaIgual && abajoIgual && dosAbajoIgual){
+           //Al menos 4 en línea vertical. +1 al punto por defecto = +2
+           puntosGenerados += 1;
+           if(dosArribaIgual && arribaIgual && abajoIgual && dosAbajoIgual){
+             //Al menos 5 en línea vertical. +2 a los 2 puntos anteriores = +4
+             puntosGenerados += 2;
+           }
+         }
+
+         dulcesAEliminar[dulcesAEliminar.length] = {elDulce:dulce,
+           posX:x, posY: y, puntos:puntosGenerados};
          continue;
       }
 
@@ -155,7 +193,18 @@ function verificarDulcesEnLinea(){
          izquierdaIgual && derechaIgual ||
          derechaIgual && dosDerechaIgual){
          //Al menos tres en línea horizontal
-         dulcesAEliminar[dulcesAEliminar.length] = {elDulce:dulce, posX:x, posY: y};
+         if(dosIzquierdaIgual && izquierdaIgual && derechaIgual ||
+            izquierdaIgual && derechaIgual && dosDerechaIgual){
+           //Al menos 4 en línea horizontal. +1 al punto por defecto = +2
+           puntosGenerados += 1;
+           if(dosIzquierdaIgual && izquierdaIgual && derechaIgual && dosDerechaIgual){
+             //Al menos 5 en línea horizontal. +2 a los 2 puntos anteriores = +4
+             puntosGenerados += 2;
+           }
+         }
+
+         dulcesAEliminar[dulcesAEliminar.length] = {elDulce:dulce,
+           posX:x, posY: y, puntos:puntosGenerados};
          continue;
       }
     }
@@ -187,14 +236,22 @@ function eliminarDulces(dulcesAEliminar){
 
   var bufferDulcesSinSoporte = [];
   for(var i = 0; i < dulcesAEliminar.length; i++){
-    var data = dulcesAEliminar[i];
+
+    var columna = $(".col-" + (dulcesAEliminar[i].posX + 1));
     //Ajustamos el valor "top" de los dulces que están sobre el que vamos a
-    //eliminar para que no se teletransporten abruptamente a causa del hueco
-    var columna = $(".col-" + (data.posX+1));
-    for(var y = 0; y < data.posY; y++){
+    //eliminar para que no se teletransporten abruptamente a causa del hueco generado
+    for(var y = 0; y < dulcesAEliminar[i].posY; y++){
       var dulceArriba = columna.find("img:nth-child(" + (y+1) +")");
+      //Nótese que se suma la altura de un dulce por cada dulce eliminado en vertical,
+      //ya que estamos en un bucle for.
       dulceArriba.css("top", "-=" + dulceArriba.height() + "px");
-      bufferDulcesSinSoporte[bufferDulcesSinSoporte.length] = dulceArriba;
+
+      //Guardamos los dulces sin soporte / en el aire para animar la caida luego
+      if(!dulceArriba.hasClass("estaAlCaer")){
+        bufferDulcesSinSoporte[bufferDulcesSinSoporte.length] = dulceArriba;
+        //Usamos una clase temporal para marcar los dulces y evitar duplicados.
+        dulceArriba.addClass("estaAlCaer");
+      }
     }
   }
   //Ahora comenzamos las animaciones para que estos caigan
@@ -202,12 +259,15 @@ function eliminarDulces(dulcesAEliminar){
     bufferDulcesSinSoporte[i].animate({
       "top":"0px"
     }, tiempoCaida, "swing");
+
+    //Quitamos la clase temporal
+    bufferDulcesSinSoporte[i].removeClass("estaAlCaer");
   }
 
   //Eliminamos los dulces, sumamos los puntos y marcamos las columnas para ser rellenadas
   for(var i = 0; i < dulcesAEliminar.length; i++){
     dulcesAEliminar[i].elDulce.remove();
-    sumarPunto();
+    sumarPuntos(dulcesAEliminar[i].puntos);
     estaColumnaRellena[dulcesAEliminar[i].posX] = false;
   }
 
@@ -225,13 +285,36 @@ function cederControlAUsuario(){
   //TO DO
 }
 
-function sumarPunto(){
-  puntos++;
-  $(".score .data-info").html(puntos);
+function sumarPuntos(cantidad){
+  puntos += cantidad;
+  $("#score-text").html(puntos);
 }
+
+function nuevoJuego(){
+  //Reiniciamos los puntos
+  $("#score-text").html("0");
+  puntos = 0;
+
+  //Reiniciamos el cronometro
+  Cronometro.reiniciar(120000); // 2 * 60 * 1000 = 2 minutos en milisegundos
+  iniciadoTimer = false;
+
+  //Reiniciamos el tablero
+  limpiarTablero();
+  rellenarTablero();
+}
+
 //----------------------------[/ JUEGO ]-------------------------------
 
 
+
+//----------------------------[ EVENTOS ]-------------------------------
+
+$(".btn-reinicio").click(function(){
+  $(this).html("Reiniciar");
+  nuevoJuego();
+});
+//----------------------------[ /EVENTOS ]------------------------------
 
 //-----------------------[  INICIALIZACIÓN  ]--------------------------
 $(function(){
@@ -239,11 +322,10 @@ $(function(){
   //Comenzamos la animación del título
   window.setTimeout(tituloABlanco, milisParpadeoTitulo);
 
-  //Reiniciamos los puntos
-  puntos = 0;
-  $(".score .data-info").html("0");
+  //Indicamos al cronómetro donde se va a mostrar el tiempo
+  Cronometro.setDisplay($("#timer"));
 
-  //Rellenamos el tablero por primera vez
-  rellenarTablero();
+  //Comenzamos un nuevo juego
+  nuevoJuego();
 });
 //-----------------------[/ INICIALIZACIÓN  ]--------------------------
