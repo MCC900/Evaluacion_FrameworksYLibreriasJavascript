@@ -15,6 +15,36 @@ $.easing.titilar = function(x, t, b, c, d){
 function intRandom(minimo, maximo){
   return minimo + Math.floor(Math.random() * (1 + maximo - minimo));
 }
+
+function contarDulcesColumna(columna){
+  return columna.children().length;
+}
+
+function todasLasColumnasRellenas(){
+  var todasRellenas = true;
+  for(var i = 0; i < 7; i++){
+    todasRellenas &= estaColumnaRellena[i];
+  }
+  return todasRellenas;
+}
+
+function dulceXYesDelTipo(x, y, tipo){
+  var columna = $(".col-" + (x+1));
+  var dulce = columna.find("img:nth-child(" + (y+1) +")");
+  return dulce.attr('src') == tipo;
+}
+
+function getXYdeDulce(dulce){
+  var col = dulce.parent();
+  var dx = parseInt(col.attr('class').substring(4,5)) - 1;
+  var dy = col.children().index(dulce);
+  return {x:dx, y:dy};
+}
+
+function getDulceEnXY(x, y){
+  var columna = $(".col-" + (x+1));
+  return columna.find("img:nth-child(" + (y+1) +")");
+}
 //-------------------[/ FUNCIONES DE UTILIDAD ]------------------------
 
 //Algunas variables de ajuste
@@ -24,7 +54,8 @@ var tiempoCaida = 800;
 var esperaSpawnDulce = 200;
 var esperaDesaparicionDulce = 500;
 var milisFadeInOpacidad = 300;
-
+var distArrastreAjustePx = 10;
+var milisAnimIntercambio = 300;
 //Datos del Juego
 var estaColumnaRellena; //Vector de 7 bools que indican si cada columna esta completa
 var puntos;
@@ -51,12 +82,18 @@ function nuevoDulce(){
 
   var dulce = $(document.createElement("img"));
   dulce.attr('src', srcImagen);
+  dulce.draggable({
+    start:comienzoArrastreDulce,
+    drag:arrastrandoDulce,
+    disabled:true,//Dragging desactivado por defecto
+    revert:true, //Devuelve el objeto a su posición original al dropearlo
+    revertDuration:0, //Se revierte inmediatamente para evitar problemas con las animaciones
+    zIndex:1000,
+    opacity:0.85
+  })
   return dulce;
 }
 
-function contarDulcesColumna(columna){
-  return columna.children().length;
-}
 
 function anadirDulceAColumna(numeroColumna){
   var dulce = nuevoDulce();
@@ -99,7 +136,10 @@ function rellenarColumna(numeroColumna){
     } else {
       estaColumnaRellena[numeroColumna - 1] = true;
       if(todasLasColumnasRellenas()){
-        window.setTimeout(verificarDulcesEnLinea, tiempoCaida);
+        window.setTimeout(
+          function(){
+            verificarDulcesEnLinea(false);
+          }, tiempoCaida);
         if(!iniciadoTimer){
           window.setTimeout(function(){
             Cronometro.arrancar();
@@ -124,15 +164,10 @@ function limpiarTablero(){
   }
 }
 
-function todasLasColumnasRellenas(){
-  var todasRellenas = true;
-  for(var i = 0; i < 7; i++){
-    todasRellenas &= estaColumnaRellena[i];
-  }
-  return todasRellenas;
-}
 
-function verificarDulcesEnLinea(){
+function verificarDulcesEnLinea(darTiempoAAnimIntercambio){
+  //El parámetro es un booleano que indica si se debe esperar a terminar la
+  //animación de intercambio de 2 dulces anter de proceder con la eliminación
   var dulcesAEliminar = [];
 
   for(var x = 0; x < 7; x++){
@@ -211,25 +246,45 @@ function verificarDulcesEnLinea(){
   }
 
   if(dulcesAEliminar.length > 0){
+
     //Comenzamos la animación de eliminación
-    for(var i = 0; i < dulcesAEliminar.length; i++){
-      dulcesAEliminar[i].elDulce.animate({
-        "opacity":"0"
-      },{
-        duration:esperaDesaparicionDulce,
-        queue:false,
-        easing:"titilar"
-      });
+    if(darTiempoAAnimIntercambio){
+      window.setTimeout(
+        function(){
+          comenzarAnimacionEliminacion(dulcesAEliminar);
+        }, milisAnimIntercambio);
+    } else {
+      comenzarAnimacionEliminacion(dulcesAEliminar);
     }
-    window.setTimeout(function(){
-      eliminarDulces(dulcesAEliminar);
-    }, esperaDesaparicionDulce);
+    //Esta función devuelve true porque hubo dulces alineados
+    return true;
   } else {
     //No quedan dulces para eliminar. Cedemos el control al usuario
-    cederControlAUsuario();
+    if(darTiempoAAnimIntercambio){
+      window.setTimeout(cederControlAUsuario, milisAnimIntercambio);
+    } else {
+      cederControlAUsuario();
+    }
+    //Esta función devuelve false porque no hubo dulces alineados
+    return false;
   }
 
   //window.setTimeout(eliminarDulces(dulcesAEliminar), esperaDesaparicionDulce);
+}
+
+function comenzarAnimacionEliminacion(dulcesAEliminar){
+  for(var i = 0; i < dulcesAEliminar.length; i++){
+    dulcesAEliminar[i].elDulce.animate({
+      "opacity":"0"
+    },{
+      duration:esperaDesaparicionDulce,
+      queue:false,
+      easing:"titilar"
+    });
+  }
+  window.setTimeout(function(){
+    eliminarDulces(dulcesAEliminar);
+  }, esperaDesaparicionDulce);
 }
 
 function eliminarDulces(dulcesAEliminar){
@@ -275,16 +330,6 @@ function eliminarDulces(dulcesAEliminar){
   rellenarTablero();
 }
 
-function dulceXYesDelTipo(x, y, tipo){
-  var columna = $(".col-" + (x+1));
-  var dulce = columna.find("img:nth-child(" + (y+1) +")");
-  return dulce.attr('src') == tipo;
-}
-
-function cederControlAUsuario(){
-  //TO DO
-}
-
 function sumarPuntos(cantidad){
   puntos += cantidad;
   $("#score-text").html(puntos);
@@ -307,14 +352,140 @@ function nuevoJuego(){
 //----------------------------[/ JUEGO ]-------------------------------
 
 
-
-//----------------------------[ EVENTOS ]-------------------------------
+//---------------------[ EVENTOS E INTERACCIÓN ]-----------------------
 
 $(".btn-reinicio").click(function(){
   $(this).html("Reiniciar");
   nuevoJuego();
 });
-//----------------------------[ /EVENTOS ]------------------------------
+
+var posStartArrastre;
+
+function setDroppableDulceAdyacente(dulceAdy, dulce){
+  //Solo permitimos intercambiar dulces distintos para evitar movimientos inútiles
+  if(dulceAdy.attr('src') != dulce.attr('src')){
+
+    dulceAdy.droppable({
+      disabled:false,
+      drop:function(event, ui){ //Al dropear, realizamos el movimiento en sí
+        var posDrag = ui.position;
+         //Creamos un span oculto en el lugar del primer dulce para marcar la posición
+        var marcador = $("<span>");
+        dulce.after(marcador);
+        dulceAdy.after(dulce);
+        marcador.replaceWith(dulceAdy);
+
+        if(!verificarDulcesEnLinea(true)){ //Si no creamos dulces en línea, entonces deshacemos el movimiento
+          marcador = $("<span>");
+          dulce.after(marcador);
+          dulceAdy.after(dulce);
+          marcador.replaceWith(dulceAdy);
+          //Creamos manualmente la animación para devolver el dulce arrastrado a su posición
+          dulce.css({
+            top:posDrag.top,
+            left:posDrag.left
+          });
+          dulce.animate({
+            top:0,
+            left:0
+          }, milisAnimIntercambio);
+
+        } else {
+          //Si el movimiento crea dulces en línea, lo permitimos,
+          //y creamos la animación de intercambio
+
+          //Ajustamos el dulce arrastrado a su nueva posición
+          dulce.css({
+            top:0,
+            left:0
+          })
+          //Animamos al dulce adyacente tomando la posición del otro
+          dulceAdy.css({
+            top:posDrag.top,
+            left:posDrag.left
+          });
+          dulceAdy.animate({
+            top:0,
+            left:0
+          }, milisAnimIntercambio);
+
+        };
+
+        //Quitamos el control al usuario luego del movimiento/intento
+        quitarControlAUsuario();
+
+      }
+    })
+  }
+}
+
+function comienzoArrastreDulce(event, ui){
+  posStartArrastre = ui.position;
+
+  //Establecemos los dulces adyacentes válidos como"droppables":
+
+  var dulce = $(event.target);
+  var posDulce = getXYdeDulce(dulce);
+  var dulceIzq = null;
+  var dulceDer = null;
+  var dulceArr = null;
+  var dulceAba = null;
+
+  if(posDulce.x > 0) { dulceIzq = getDulceEnXY(posDulce.x - 1, posDulce.y    ); }
+  if(posDulce.x < 6) { dulceDer = getDulceEnXY(posDulce.x + 1, posDulce.y    ); }
+  if(posDulce.y > 0) { dulceArr = getDulceEnXY(posDulce.x    , posDulce.y - 1); }
+  if(posDulce.y < 6) { dulceAba = getDulceEnXY(posDulce.x    , posDulce.y + 1); }
+
+  if(dulceIzq != null){ setDroppableDulceAdyacente(dulceIzq, dulce); }
+  if(dulceDer != null){ setDroppableDulceAdyacente(dulceDer, dulce); }
+  if(dulceArr != null){ setDroppableDulceAdyacente(dulceArr, dulce); }
+  if(dulceAba != null){ setDroppableDulceAdyacente(dulceAba, dulce); }
+}
+
+function arrastrandoDulce(event, ui){
+  var difx = ui.position.left - posStartArrastre.left;
+  var dify = ui.position.top - posStartArrastre.top;
+  var absDifX = Math.abs(difx);
+  var absDifY = Math.abs(dify);
+
+  if(absDifX > distArrastreAjustePx || absDifY > distArrastreAjustePx){
+
+    var distDulces = $(".panel-tablero img:first-child").width(); //distancia entre dulces adyacentes
+
+    if(absDifX > absDifY){
+      //Bloqueamos el movimiento para el eje x
+      ui.position.top = 0;
+      //Ponemos distDulces como el tope de distancia a la que podemos alejar el dulce
+      if(difx > distDulces){ //Derecha
+        ui.position.left = posStartArrastre.left + distDulces;
+      } else if(difx < -distDulces) { //Izquierda
+        ui.position.left = posStartArrastre.left - distDulces;
+      }
+    } else {
+      //Bloqueamos el movimiento para el eje y
+      ui.position.left = 0;
+      //Ponemos distDulces como el tope de distancia a la que podemos alejar el dulce
+      if(dify > distDulces){ //Abajo
+        ui.position.top = posStartArrastre.top + distDulces;
+      } else if(dify < -distDulces) { //Arriba
+        ui.position.top = posStartArrastre.top - distDulces;
+      }
+    }
+  }
+}
+
+function cederControlAUsuario(){
+  var dulces = $(".panel-tablero img");
+  dulces.draggable({ disabled:false });
+}
+
+function quitarControlAUsuario(){
+  var dulces = $(".panel-tablero img");
+  dulces.droppable({disabled:true});
+  dulces.draggable({disabled:true});
+}
+
+//---------------------[/ EVENTOS E INTERACCIÓN ]----------------------
 
 //-----------------------[  INICIALIZACIÓN  ]--------------------------
 $(function(){

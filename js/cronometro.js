@@ -3,6 +3,7 @@
 var Cronometro = (function(){
   var momentoInicio;
   var tiempoDisponible;
+  var intervalActualizar;
 
   var display;
   function formatearNumero(numero, cantDigitos){
@@ -15,14 +16,16 @@ var Cronometro = (function(){
 
   function actualizarDisplay(){
     var ahora = Date.now();
-    var tiempo = new Date(tiempoDisponible - (ahora - momentoInicio));
-
+    var tiempo = tiempoDisponible - (ahora - momentoInicio);
     if(tiempo <= 0){
-      window.clearInterval(actualizarDisplay);
+      window.clearInterval(intervalActualizar);
+      tiempo = 0;
     }
-    var minutos = tiempo.getMinutes();
-    var segundos = formatearNumero(tiempo.getSeconds(), 2);
-    var centesimas = formatearNumero(Math.floor(tiempo.getMilliseconds() / 10), 2);
+    var dateTiempo = new Date(tiempo);
+
+    var minutos = dateTiempo.getMinutes();
+    var segundos = formatearNumero(dateTiempo.getSeconds(), 2);
+    var centesimas = formatearNumero(Math.floor(dateTiempo.getMilliseconds() / 10), 2);
     display.text(minutos + ":" + segundos + ":" + centesimas);
   }
 
@@ -31,7 +34,7 @@ var Cronometro = (function(){
   }
 
   function arrancarCronometro(){
-    window.setInterval(actualizarDisplay, 10);
+    intervalActualizar = window.setInterval(actualizarDisplay, 10);
     momentoInicio = Date.now();
   }
 
