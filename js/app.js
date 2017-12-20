@@ -48,20 +48,23 @@ function getDulceEnXY(x, y){
 //-------------------[/ FUNCIONES DE UTILIDAD ]------------------------
 
 //Algunas variables de ajuste
-var milisParpadeoTitulo = 600;
+var milisParpadeoTitulo = 500;
 var maxDulcesPorColumna = 7;
 var tiempoCaida = 800;
 var esperaSpawnDulce = 200;
 var esperaDesaparicionDulce = 500;
 var milisFadeInOpacidad = 300;
 var distArrastreAjustePx = 10;
-var milisAnimIntercambio = 300;
+var milisAnimIntercambio = 300; //También determina lo que tarda un dulce en volver a su posición original en un intento de movimiento inválido
+
 //Datos del Juego
 var estaColumnaRellena; //Vector de 7 bools que indican si cada columna esta completa
 var puntos;
+var movimientos;
 var iniciadoTimer; //El timer se inicia cuando se termina el llenado del tablero por primera vez
+var timerTermino; //Bool que indica si el timer llegó a cero.
+var estaTodoQuieto; //Bool que es falso mientras se estén generando reacciones en cadena
 //--------------------[ ANIMACIÓN DEL TÍTULO ]-------------------------
-
 
 function tituloABlanco(){
   $(".main-titulo").css("color","white");
@@ -131,16 +134,22 @@ function rellenarColumna(numeroColumna){
 
     //Verificamos que la columna no esté llena
     if(cantDulces < maxDulcesPorColumna){
+      //Si le faltan dulces, añadimos un dulce y volvemos a llamar a rellenarColumna recursivamente
       anadirDulceAColumna(numeroColumna);
       window.setTimeout(function(){ rellenarColumna(numeroColumna); }, esperaSpawnDulce);
     } else {
-      estaColumnaRellena[numeroColumna - 1] = true;
-      if(todasLasColumnasRellenas()){
+      //De lo contrario, la columna está llena
+      estaColumnaRellena[numeroColumna - 1] = true; //La marcamos como llena
+      if(todasLasColumnasRellenas()){ //Si el resto de columnas también están llenas
+
+        //Verificamos si se han generado nuevas lineas de dulces para eliminar
         window.setTimeout(
           function(){
             verificarDulcesEnLinea(false);
           }, tiempoCaida);
+
         if(!iniciadoTimer){
+           //Iniciamos el timer si es el caso, luego del tiempo que tarde en caer el último dulce
           window.setTimeout(function(){
             Cronometro.arrancar();
             iniciadoTimer = true;
@@ -157,7 +166,7 @@ function rellenarTablero(){
 }
 
 function limpiarTablero(){
-  estaColumnaRellena =  [false, false, false, false, false, false, false];
+  estaColumnaRellena =  [false, false, false, false, false, false, false]; //Marcamos todas las columnas como vacías
   for(var i = 1; i <= 7; i++){
     var columna = $(".col-" + i);
     columna.empty();
@@ -174,13 +183,13 @@ function verificarDulcesEnLinea(darTiempoAAnimIntercambio){
     var columna = $(".col-" + (x+1));
     //Recordar que y es cero para los dulces superiores y va aumentando segun bajamos
     for(var y = 0; y < maxDulcesPorColumna; y++){
-     //:nth-child empieza en índice 1 según https://api.jquery.com/nth-child-selector/
+
       var dulce = columna.find("img:nth-child(" + (y+1) +")");
       var tipo = dulce.attr('src');
 
       //Un dulce eliminado genera:
       // 1 punto de base
-      //+1 punto si además es uno de los 2 centros de una línea d 4
+      //+1 punto si además es uno de los 2 centros de una línea de 4
       //+2 puntos si además es el centro de una línea de 5
       //Los puntos verticales y horizontales se calculan por separado y se suman
       var puntosGenerados = 1;
@@ -246,6 +255,7 @@ function verificarDulcesEnLinea(darTiempoAAnimIntercambio){
   }
 
   if(dulcesAEliminar.length > 0){
+    estaTodoQuieto = false;
 
     //Comenzamos la animación de eliminación
     if(darTiempoAAnimIntercambio){
@@ -261,15 +271,22 @@ function verificarDulcesEnLinea(darTiempoAAnimIntercambio){
   } else {
     //No quedan dulces para eliminar. Cedemos el control al usuario
     if(darTiempoAAnimIntercambio){
+      //Esto se da si el usuario hizo un movimiento inválido, se da tiempo a la animación
+      //que devuelve la pieza arrastrada a su posición original antes de volver a dar el control
       window.setTimeout(cederControlAUsuario, milisAnimIntercambio);
     } else {
-      cederControlAUsuario();
+      estaTodoQuieto = true;
+      if(timerTermino){
+          //No cedemos el control si el timer ha acabado. En este caso termina el Juego
+          finalizarJuego();
+      } else {
+          cederControlAUsuario();
+      }
     }
     //Esta función devuelve false porque no hubo dulces alineados
     return false;
   }
 
-  //window.setTimeout(eliminarDulces(dulcesAEliminar), esperaDesaparicionDulce);
 }
 
 function comenzarAnimacionEliminacion(dulcesAEliminar){
@@ -343,12 +360,31 @@ function nuevoJuego(){
   //Reiniciamos el cronometro
   Cronometro.reiniciar(120000); // 2 * 60 * 1000 = 2 minutos en milisegundos
   iniciadoTimer = false;
+  timerTermino = false;
+
+  //Reiniciamos el contador de Movimientos
+  movimientos = 0;
+  $("#movimientos-text").text("0");
+
+  //Reiniciamos esta variable
+  estaTodoQuieto = true;
 
   //Reiniciamos el tablero
   limpiarTablero();
   rellenarTablero();
 }
 
+function marcarFinTimer(){
+  timerTermino = true;
+  if(estaTodoQuieto){ //Si no hay partes moviéndose, finalizamos la partida
+    finalizarJuego();
+  }
+}
+
+function finalizarJuego(){
+  quitarControlAUsuario();
+  alert("¡FIN DEL JUEGO! \n \n Puntaje: " + puntos + "\n Movimientos: " + movimientos);
+}
 //----------------------------[/ JUEGO ]-------------------------------
 
 
@@ -409,6 +445,9 @@ function setDroppableDulceAdyacente(dulceAdy, dulce){
             left:0
           }, milisAnimIntercambio);
 
+          //Agregamos +1 a la cantidad de movimientos
+          movimientos++;
+          $("#movimientos-text").text(movimientos);
         };
 
         //Quitamos el control al usuario luego del movimiento/intento
@@ -449,10 +488,12 @@ function arrastrandoDulce(event, ui){
   var absDifY = Math.abs(dify);
 
   if(absDifX > distArrastreAjustePx || absDifY > distArrastreAjustePx){
+    //Si se ha arrastrado el dulce lo suficientemente lejos, bloquearemos el movimiento en un eje
 
     var distDulces = $(".panel-tablero img:first-child").width(); //distancia entre dulces adyacentes
 
-    if(absDifX > absDifY){
+    if(absDifX > absDifY){ //Según la dirección tomada, bloqueamos uno u otro eje
+
       //Bloqueamos el movimiento para el eje x
       ui.position.top = 0;
       //Ponemos distDulces como el tope de distancia a la que podemos alejar el dulce
@@ -493,10 +534,8 @@ $(function(){
   //Comenzamos la animación del título
   window.setTimeout(tituloABlanco, milisParpadeoTitulo);
 
-  //Indicamos al cronómetro donde se va a mostrar el tiempo
+  //Indicamos al cronómetro donde se va a mostrar el tiempo, y la función a ejecutar al llegar a cero
   Cronometro.setDisplay($("#timer"));
-
-  //Comenzamos un nuevo juego
-  nuevoJuego();
+  Cronometro.setFuncionFin(marcarFinTimer);
 });
 //-----------------------[/ INICIALIZACIÓN  ]--------------------------
