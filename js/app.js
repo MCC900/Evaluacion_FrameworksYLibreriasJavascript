@@ -360,7 +360,7 @@ function nuevoJuego(){
   puntos = 0;
 
   //Reiniciamos el cronometro
-  Cronometro.reiniciar(5000); // 2 * 60 * 1000 = 2 minutos en milisegundos
+  Cronometro.reiniciar(120000); // 2 * 60 * 1000 = 2 minutos en milisegundos
   iniciadoTimer = false;
   timerTermino = false;
 
@@ -389,12 +389,14 @@ function finalizarJuego(){
   //Escondemos el tablero
   var tablero = $(".panel-tablero");
   var panelScore = $(".panel-score");
-  tablero.hide("fold", 1500);
-  panelScore.hide("fold", 1500);
-  panelScore.show("fold", 500);
-  panelScore.animate({
-    width:"100%"
-  }, 1000);
+
+  //Ocultamos el tablero. El css del .panel-score deberia causar que este se agrande automáticamente
+  tablero.animate({
+    minWidth:0,
+    width:0,
+    opacity:0,
+    borderWidth:0
+  }, 2000);
 }
 //----------------------------[/ JUEGO ]-------------------------------
 
