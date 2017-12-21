@@ -1,8 +1,9 @@
 
 
 
-//Función de easing personalizada para la desaparición de los dulces (soy un mago)
+//Función de easing personalizada para la desaparición de los dulces
 //Info obtenida de http://brianwald.com/journal/creating-custom-jquery-easing-animations
+//Me di cuenta de que existía el efecto "pulsate" después -.-
 $.easing.titilar = function(x, t, b, c, d){
   var tiempo01 = t / d;
   var repeticiones = 2; //Modificar para cambiar número de veces que titila
@@ -61,6 +62,7 @@ var milisAnimIntercambio = 300; //También determina lo que tarda un dulce en vo
 var estaColumnaRellena; //Vector de 7 bools que indican si cada columna esta completa
 var puntos;
 var movimientos;
+var juegoIniciado; //Bool que indica si se ha hecho click en "Iniciar"
 var iniciadoTimer; //El timer se inicia cuando se termina el llenado del tablero por primera vez
 var timerTermino; //Bool que indica si el timer llegó a cero.
 var estaTodoQuieto; //Bool que es falso mientras se estén generando reacciones en cadena
@@ -358,7 +360,7 @@ function nuevoJuego(){
   puntos = 0;
 
   //Reiniciamos el cronometro
-  Cronometro.reiniciar(120000); // 2 * 60 * 1000 = 2 minutos en milisegundos
+  Cronometro.reiniciar(5000); // 2 * 60 * 1000 = 2 minutos en milisegundos
   iniciadoTimer = false;
   timerTermino = false;
 
@@ -383,17 +385,21 @@ function marcarFinTimer(){
 
 function finalizarJuego(){
   quitarControlAUsuario();
-  alert("¡FIN DEL JUEGO! \n \n Puntaje: " + puntos + "\n Movimientos: " + movimientos);
+
+  //Escondemos el tablero
+  var tablero = $(".panel-tablero");
+  var panelScore = $(".panel-score");
+  tablero.hide("fold", 1500);
+  panelScore.hide("fold", 1500);
+  panelScore.show("fold", 500);
+  panelScore.animate({
+    width:"100%"
+  }, 1000);
 }
 //----------------------------[/ JUEGO ]-------------------------------
 
 
 //---------------------[ EVENTOS E INTERACCIÓN ]-----------------------
-
-$(".btn-reinicio").click(function(){
-  $(this).html("Reiniciar");
-  nuevoJuego();
-});
 
 var posStartArrastre;
 
@@ -530,12 +536,24 @@ function quitarControlAUsuario(){
 
 //-----------------------[  INICIALIZACIÓN  ]--------------------------
 $(function(){
-
   //Comenzamos la animación del título
   window.setTimeout(tituloABlanco, milisParpadeoTitulo);
 
   //Indicamos al cronómetro donde se va a mostrar el tiempo, y la función a ejecutar al llegar a cero
   Cronometro.setDisplay($("#timer"));
   Cronometro.setFuncionFin(marcarFinTimer);
+
+  juegoIniciado = false;
+
+  $(".btn-reinicio").click(function(){
+    if(juegoIniciado){
+      location.reload();
+    } else {
+      juegoIniciado = true;
+      $(this).html("Reiniciar");
+      nuevoJuego();
+    }
+  });
+
 });
 //-----------------------[/ INICIALIZACIÓN  ]--------------------------
